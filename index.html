@@ -7,359 +7,194 @@
 <title>Battle Royale 3D</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;overflow:hidden;background:#111;font-family:Arial;color:white}
-#hud{position:fixed;top:12px;left:12px;z-index:5}
-.panel{background:#0009;padding:12px;border-radius:10px;margin-bottom:7px}
-#health{color:#42ff75;font-weight:bold}
-#start{position:fixed;inset:0;background:#000b;z-index:10;
-display:flex;align-items:center;justify-content:center;flex-direction:column}
-button{padding:14px 24px;border:0;border-radius:10px;
-background:#ff9800;color:white;font-size:18px;font-weight:bold}
-#controls{position:fixed;bottom:20px;left:20px;right:20px;
-display:flex;justify-content:space-between;pointer-events:none}
-#controls button{pointer-events:auto;opacity:.85}
-#message{font-size:14px}
+body{margin:0;overflow:hidden;background:#101820;color:white;font-family:Arial}
+canvas{display:block}
+#hud{position:fixed;top:12px;left:12px;z-index:5;pointer-events:none}
+.box{background:#111d;padding:10px 14px;margin-bottom:7px;border-radius:9px}
+#health{color:#35ff69}
+#start{
+ position:fixed;inset:0;background:linear-gradient(#071b25dd,#000e);
+ z-index:20;display:flex;align-items:center;justify-content:center;
+ flex-direction:column;text-align:center;padding:20px
+}
+h1{color:#ffae00;font-size:36px}
+button{
+ border:0;border-radius:10px;padding:14px 22px;
+ background:#ff9800;color:white;font-size:17px;
+ font-weight:bold;cursor:pointer;touch-action:none
+}
+button:active{transform:scale(.95)}
+#controls{
+ position:fixed;bottom:20px;left:15px;right:15px;
+ display:flex;justify-content:space-between;align-items:end;
+ z-index:8;pointer-events:none
+}
+#controls button{pointer-events:auto;min-width:65px}
+#move{display:flex;gap:8px}
+#fire{background:#ed3428}
+#restart{background:#159c55}
+#status{max-width:300px;line-height:1.5;color:#ddd}
 </style>
 </head>
 <body>
 
 <div id="hud">
- <div class="panel">BATTLE ROYALE 3D</div>
- <div class="panel">❤️ Health: <span id="health">100</span></div>
- <div class="panel">🎯 Score: <span id="score">0</span></div>
- <div class="panel">👾 Enemies: <span id="enemies">0</span></div>
- <div id="message"></div>
+ <div class="box">🔥 BATTLE ROYALE 3D</div>
+ <div class="box">❤️ Health: <span id="health">100</span></div>
+ <div class="box">🎯 Score: <span id="score">0</span></div>
+ <div class="box">👾 Enemies: <span id="enemies">0</span></div>
 </div>
 
 <div id="start">
  <h1>🔥 BATTLE ROYALE</h1>
  <p>3D Survival Mini Game</p>
- <button onclick="startGame()">START GAME</button>
+ <p id="status">Loading 3D engine...</p>
+ <button id="startBtn" disabled>LOADING...</button>
 </div>
 
 <div id="controls">
- <button id="left">◀</button>
- <button id="shoot">🔫 FIRE</button>
- <button id="right">▶</button>
+ <div id="move">
+  <button id="left">◀</button>
+  <button id="forward">▲</button>
+  <button id="back">▼</button>
+  <button id="right">▶</button>
+ </div>
+ <button id="fire">🔫 FIRE</button>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-let scene,camera,renderer,player;
-let enemies=[],bullets=[];
-let health=100,score=0,playing=false;
-let keys={};
-let move={left:false,right:false,up:false,down:false};
-
-function startGame(){
- document.getElementById("start").style.display="none";
- if(!renderer) init();
- playing=true;
-}
-
-function init(){
- scene=new THREE.Scene();
- scene.background=new THREE.Color(0x87ceeb);
- scene.fog=new THREE.Fog(0x87ceeb,40,150);
-
- camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,500);
- renderer=new THREE.WebGLRenderer({antialias:true});
- renderer.setSize(innerWidth,innerHeight);
- renderer.setPixelRatio(Math.min(devicePixelRatio,2));
- document.body.appendChild(renderer.domElement);
-
- scene.add(new THREE.HemisphereLight(0xffffff,0x445533,2));
- let sun=new THREE.DirectionalLight(0xffffff,2);
- sun.position.set(20,40,20);
- scene.add(sun);
-
- let ground=new THREE.Mesh(
-  new THREE.PlaneGeometry(200,200),
-  new THREE.MeshStandardMaterial({color:0x477b37})
- );
- ground.rotation.x=-Math.PI/2;
- scene.add(ground);
-
- // Buildings
- for(let i=0;i<35;i++){
-  let x=Math.random()*120-60;
-  let z=Math.random()*120-60;
-  if(Math.abs(x)<9 && Math.abs(z)<9)continue;
-  let w=5+Math.random()*5;
-  let h=4+Math.random()*9;
-  let b=new THREE.Mesh(
-   new THREE.BoxGeometry(w,h,6),
-   new THREE.MeshStandardMaterial({color:0x99918a})
-  );
-  b.position.set(x,h/2,z);
-  scene.add(b);
- }
-
- // Trees
- for(let i=0;i<60;i++){
-  let x=Math.random()*150-75;
-  let z=Math.random()*150-75;
-  let trunk=new THREE.Mesh(
-   new THREE.CylinderGeometry(.25,.4,2),
-   new THREE.MeshStandardMaterial({color:0x654321})
-  );
-  trunk.position.set(x,1,z);
-  scene.add(trunk);
-  let leaves=new THREE.Mesh(
-   new THREE.SphereGeometry(1.8,8,8),
-   new THREE.MeshStandardMaterial({color:0x176b28})
-  );
-  leaves.position.set(x,3,z);
-  scene.add(leaves);
- }
-
- // Player
- player=new THREE.Group();
- let body=new THREE.Mesh(
-  new THREE.BoxGeometry(1,1.6,.6),
-  new THREE.MeshStandardMaterial({color:0x174cff})
- );
- body.position.y=1;
- player.add(body);
- let head=new THREE.Mesh(
-  new THREE.SphereGeometry(.38,16,16),
-  new THREE.MeshStandardMaterial({color:0xffc99b})
- );
- head.position.y=2;
- player.add(head);
- scene.add(player);
- player.position.set(0,0,0);
-
- for(let i=0;i<8;i++)createEnemy();
-
- camera.position.set(0,7,10);
- animate();
-}
-
-function createEnemy(){
- let enemy=new THREE.Mesh(
-  new THREE.BoxGeometry(1,1.8,.7),
-  new THREE.MeshStandardMaterial({color:0xff3030})
- );
- enemy.position.set(Math.random()*50-25,1,Math.random()*50-25);
- enemy.userData.hp=1;
- scene.add(enemy);
- enemies.push(enemy);
-}
-
-function shoot(){
- if(!playing)return;
- let direction=new THREE.Vector3(0,0,-1);
- direction.applyQuaternion(player.quaternion);
- let bullet=new THREE.Mesh(
-  new THREE.SphereGeometry(.16,8,8),
-  new THREE.MeshBasicMaterial({color:0xffff00})
- );
- bullet.position.copy(player.position);
- bullet.position.y+=1.3;
- bullet.userData.velocity=direction.multiplyScalar(.9);
- scene.add(bullet);
- bullets.push(bullet);
-}
-
-function animate(){
- requestAnimationFrame(animate);
- if(!playing)return;
-
- let speed=.16;
- if(keys["w"]||keys["ArrowUp"]||move.up)player.position.z-=speed;
- if(keys["s"]||keys["ArrowDown"]||move.down)player.position.z+=speed;
- if(keys["a"]||keys["ArrowLeft"]||move.left)player.position.x-=speed;
- if(keys["d"]||keys["ArrowRight"]||move.right)player.position.x+=speed;
-
- player.position.x=Math.max(-90,Math.min(90,player.position.x));
- player.position.z=Math.max(-90,Math.min(90,player.position.z));
-
- camera.position.lerp(
-  new THREE.Vector3(player.position.x,player.position.y+7,player.position.z+10),.1
- );
- camera.lookAt(player.position.x,player.position.y+1,player.position.z);
-
- bullets.forEach((b,i)=>{
-  b.position.add(b.userData.velocity);
-  enemies.forEach((e,j)=>{
-   if(b.position.distanceTo(e.position)<1.4){
-    scene.remove(e);
-    scene.remove(b);
-    enemies.splice(j,1);
-    bullets.splice(i,1);
-    score+=10;
-    document.getElementById("score").textContent=score;
-   }
-  });
-  if(Math.abs(b.position.x)>100||Math.abs(b.position.z)>100){
-   scene.remove(b);
-   bullets.splice(i,1);
-  }
- });
-
- enemies.forEach(e=>{
-  let dir=new THREE.Vector3().subVectors(player.position,e.position);
-  dir.y=0;
-  if(dir.length()>1.5){
-   dir.normalize();
-   e.position.addScaledVector(dir,.025);
-  }
-  if(e.position.distanceTo(player.position)<1.5){
-   health-=.015;
-  }
- });
-
- document.getElementById("health").textContent=Math.max(0,Math.floor(health));
- document.getElementById("enemies").textContent=enemies.length;
-
- if(health<=0){
-  playing=false;
-  document.getElementById("message").textContent="GAME OVER! Refresh to restart.";
- }
- if(enemies.length===0 && playing){
-  for(let i=0;i<8;i++)createEnemy();
- }
- renderer.render(scene,camera);
-}
-
-document.addEventListener("keydown",e=>keys[e.key]=true);
-document.addEventListener("keyup",e=>keys[e.key]=false);
-
-function bind(id,property){
- let el=document.getElementById(id);
- el.addEventListener("pointerdown",e=>{
-  e.preventDefault();move[property]=true;
- });
- ["pointerup","pointerleave","pointercancel"].forEach(event=>{
-  el.addEventListener(event,()=>move[property]=false);
- });
-}
-bind("left","left");
-bind("right","right");
-
-document.getElementById("shoot").addEventListener("pointerdown",shoot);
-
-document.addEventListener("click",e=>{
- if(e.target===renderer?.domElement)shoot();
-});
-
-window.addEventListener("resize",()=>{
- if(!camera)return;
- camera.aspect=innerWidth/innerHeight;
- camera.updateProjectionMatrix();
- renderer.setSize(innerWidth,innerHeight);
-});
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"
+ onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js'">
 </script>
-</body>
-</html>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Battle Royale 3D</title>
-<style>
-*{box-sizing:border-box}
-body{margin:0;overflow:hidden;background:#111;font-family:Arial;color:white}
-#hud{position:fixed;top:12px;left:12px;z-index:5}
-.panel{background:#0009;padding:12px;border-radius:10px;margin-bottom:7px}
-#health{color:#42ff75;font-weight:bold}
-#start{position:fixed;inset:0;background:#000b;z-index:10;
-display:flex;align-items:center;justify-content:center;flex-direction:column}
-button{padding:14px 24px;border:0;border-radius:10px;
-background:#ff9800;color:white;font-size:18px;font-weight:bold}
-#controls{position:fixed;bottom:20px;left:20px;right:20px;
-display:flex;justify-content:space-between;pointer-events:none}
-#controls button{pointer-events:auto;opacity:.85}
-#message{font-size:14px}
-</style>
-</head>
-<body>
-
-<div id="hud">
- <div class="panel">BATTLE ROYALE 3D</div>
- <div class="panel">❤️ Health: <span id="health">100</span></div>
- <div class="panel">🎯 Score: <span id="score">0</span></div>
- <div class="panel">👾 Enemies: <span id="enemies">0</span></div>
- <div id="message"></div>
-</div>
-
-<div id="start">
- <h1>🔥 BATTLE ROYALE</h1>
- <p>3D Survival Mini Game</p>
- <button onclick="startGame()">START GAME</button>
-</div>
-
-<div id="controls">
- <button id="left">◀</button>
- <button id="shoot">🔫 FIRE</button>
- <button id="right">▶</button>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
+"use strict";
+
 let scene,camera,renderer,player;
 let enemies=[],bullets=[];
-let health=100,score=0,playing=false;
+let health=100,score=0;
+let playing=false,initialized=false;
 let keys={};
-let move={left:false,right:false,up:false,down:false};
+let movement={left:false,right:false,forward:false,back:false};
+let lastDamage=0;
+
+const $=id=>document.getElementById(id);
+
+function status(message){
+ $("status").textContent=message;
+}
 
 function startGame(){
- document.getElementById("start").style.display="none";
- if(!renderer) init();
+ if(!window.THREE){
+  status("3D engine load nahi hua. Internet check karke page reload karo.");
+  return;
+ }
+
+ if(!initialized){
+  try{
+   init();
+   initialized=true;
+  }catch(error){
+   console.error(error);
+   status("Game error: "+error.message);
+   return;
+  }
+ }
+
+ health=100;
+ score=0;
+ $("health").textContent=100;
+ $("score").textContent=0;
+ $("start").style.display="none";
+
+ // Reset player and enemies
+ player.position.set(0,0,0);
+ player.rotation.set(0,0,0);
+
+ enemies.forEach(e=>scene.remove(e));
+ bullets.forEach(b=>scene.remove(b));
+ enemies=[];
+ bullets=[];
+
+ for(let i=0;i<8;i++)createEnemy();
+
  playing=true;
 }
+
+$("startBtn").addEventListener("click",startGame);
 
 function init(){
  scene=new THREE.Scene();
  scene.background=new THREE.Color(0x87ceeb);
- scene.fog=new THREE.Fog(0x87ceeb,40,150);
+ scene.fog=new THREE.Fog(0x87ceeb,45,150);
 
- camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,500);
+ camera=new THREE.PerspectiveCamera(
+  70,innerWidth/innerHeight,.1,500
+ );
+
  renderer=new THREE.WebGLRenderer({antialias:true});
  renderer.setSize(innerWidth,innerHeight);
  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+ renderer.shadowMap.enabled=true;
  document.body.appendChild(renderer.domElement);
 
  scene.add(new THREE.HemisphereLight(0xffffff,0x445533,2));
- let sun=new THREE.DirectionalLight(0xffffff,2);
- sun.position.set(20,40,20);
+
+ const sun=new THREE.DirectionalLight(0xffffff,2);
+ sun.position.set(30,50,20);
+ sun.castShadow=true;
  scene.add(sun);
 
- let ground=new THREE.Mesh(
+ // Ground
+ const ground=new THREE.Mesh(
   new THREE.PlaneGeometry(200,200),
   new THREE.MeshStandardMaterial({color:0x477b37})
  );
  ground.rotation.x=-Math.PI/2;
+ ground.receiveShadow=true;
  scene.add(ground);
+
+ // Roads
+ for(let i=-80;i<=80;i+=40){
+  let road=new THREE.Mesh(
+   new THREE.BoxGeometry(7,.05,200),
+   new THREE.MeshStandardMaterial({color:0x555555})
+  );
+  road.position.set(i,.03,0);
+  scene.add(road);
+ }
 
  // Buildings
  for(let i=0;i<35;i++){
-  let x=Math.random()*120-60;
-  let z=Math.random()*120-60;
-  if(Math.abs(x)<9 && Math.abs(z)<9)continue;
+  let x=Math.random()*130-65;
+  let z=Math.random()*130-65;
+
+  if(Math.abs(x)<12 && Math.abs(z)<12)continue;
+
   let w=5+Math.random()*5;
-  let h=4+Math.random()*9;
-  let b=new THREE.Mesh(
+  let h=4+Math.random()*8;
+
+  let building=new THREE.Mesh(
    new THREE.BoxGeometry(w,h,6),
    new THREE.MeshStandardMaterial({color:0x99918a})
   );
-  b.position.set(x,h/2,z);
-  scene.add(b);
+  building.position.set(x,h/2,z);
+  building.castShadow=true;
+  building.receiveShadow=true;
+  scene.add(building);
  }
 
  // Trees
- for(let i=0;i<60;i++){
+ for(let i=0;i<55;i++){
   let x=Math.random()*150-75;
   let z=Math.random()*150-75;
+
   let trunk=new THREE.Mesh(
    new THREE.CylinderGeometry(.25,.4,2),
    new THREE.MeshStandardMaterial({color:0x654321})
   );
   trunk.position.set(x,1,z);
   scene.add(trunk);
+
   let leaves=new THREE.Mesh(
    new THREE.SphereGeometry(1.8,8,8),
    new THREE.MeshStandardMaterial({color:0x176b28})
@@ -370,1157 +205,261 @@ function init(){
 
  // Player
  player=new THREE.Group();
+
  let body=new THREE.Mesh(
-  new THREE.BoxGeometry(1,1.6,.6),
+  new THREE.BoxGeometry(1,1.5,.65),
   new THREE.MeshStandardMaterial({color:0x174cff})
  );
  body.position.y=1;
  player.add(body);
+
  let head=new THREE.Mesh(
   new THREE.SphereGeometry(.38,16,16),
   new THREE.MeshStandardMaterial({color:0xffc99b})
  );
  head.position.y=2;
  player.add(head);
+
+ let gun=new THREE.Mesh(
+  new THREE.BoxGeometry(.18,.18,1.2),
+  new THREE.MeshStandardMaterial({color:0x222222})
+ );
+ gun.position.set(.5,1.3,-.6);
+ player.add(gun);
+
  scene.add(player);
  player.position.set(0,0,0);
 
- for(let i=0;i<8;i++)createEnemy();
-
  camera.position.set(0,7,10);
+ camera.lookAt(0,1,0);
+
  animate();
 }
 
 function createEnemy(){
- let enemy=new THREE.Mesh(
-  new THREE.BoxGeometry(1,1.8,.7),
-  new THREE.MeshStandardMaterial({color:0xff3030})
- );
- enemy.position.set(Math.random()*50-25,1,Math.random()*50-25);
- enemy.userData.hp=1;
- scene.add(enemy);
- enemies.push(enemy);
-}
+ const enemy=new THREE.Group();
 
-function shoot(){
- if(!playing)return;
- let direction=new THREE.Vector3(0,0,-1);
- direction.applyQuaternion(player.quaternion);
- let bullet=new THREE.Mesh(
-  new THREE.SphereGeometry(.16,8,8),
-  new THREE.MeshBasicMaterial({color:0xffff00})
- );
- bullet.position.copy(player.position);
- bullet.position.y+=1.3;
- bullet.userData.velocity=direction.multiplyScalar(.9);
- scene.add(bullet);
- bullets.push(bullet);
-}
-
-function animate(){
- requestAnimationFrame(animate);
- if(!playing)return;
-
- let speed=.16;
- if(keys["w"]||keys["ArrowUp"]||move.up)player.position.z-=speed;
- if(keys["s"]||keys["ArrowDown"]||move.down)player.position.z+=speed;
- if(keys["a"]||keys["ArrowLeft"]||move.left)player.position.x-=speed;
- if(keys["d"]||keys["ArrowRight"]||move.right)player.position.x+=speed;
-
- player.position.x=Math.max(-90,Math.min(90,player.position.x));
- player.position.z=Math.max(-90,Math.min(90,player.position.z));
-
- camera.position.lerp(
-  new THREE.Vector3(player.position.x,player.position.y+7,player.position.z+10),.1
- );
- camera.lookAt(player.position.x,player.position.y+1,player.position.z);
-
- bullets.forEach((b,i)=>{
-  b.position.add(b.userData.velocity);
-  enemies.forEach((e,j)=>{
-   if(b.position.distanceTo(e.position)<1.4){
-    scene.remove(e);
-    scene.remove(b);
-    enemies.splice(j,1);
-    bullets.splice(i,1);
-    score+=10;
-    document.getElementById("score").textContent=score;
-   }
-  });
-  if(Math.abs(b.position.x)>100||Math.abs(b.position.z)>100){
-   scene.remove(b);
-   bullets.splice(i,1);
-  }
- });
-
- enemies.forEach(e=>{
-  let dir=new THREE.Vector3().subVectors(player.position,e.position);
-  dir.y=0;
-  if(dir.length()>1.5){
-   dir.normalize();
-   e.position.addScaledVector(dir,.025);
-  }
-  if(e.position.distanceTo(player.position)<1.5){
-   health-=.015;
-  }
- });
-
- document.getElementById("health").textContent=Math.max(0,Math.floor(health));
- document.getElementById("enemies").textContent=enemies.length;
-
- if(health<=0){
-  playing=false;
-  document.getElementById("message").textContent="GAME OVER! Refresh to restart.";
- }
- if(enemies.length===0 && playing){
-  for(let i=0;i<8;i++)createEnemy();
- }
- renderer.render(scene,camera);
-}
-
-document.addEventListener("keydown",e=>keys[e.key]=true);
-document.addEventListener("keyup",e=>keys[e.key]=false);
-
-function bind(id,property){
- let el=document.getElementById(id);
- el.addEventListener("pointerdown",e=>{
-  e.preventDefault();move[property]=true;
- });
- ["pointerup","pointerleave","pointercancel"].forEach(event=>{
-  el.addEventListener(event,()=>move[property]=false);
- });
-}
-bind("left","left");
-bind("right","right");
-
-document.getElementById("shoot").addEventListener("pointerdown",shoot);
-
-document.addEventListener("click",e=>{
- if(e.target===renderer?.domElement)shoot();
-});
-
-window.addEventListener("resize",()=>{
- if(!camera)return;
- camera.aspect=innerWidth/innerHeight;
- camera.updateProjectionMatrix();
- renderer.setSize(innerWidth,innerHeight);
-});
-</script>
-</body>
-</html>
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Battle Royale 3D</title>
-<style>
-*{box-sizing:border-box}
-body{margin:0;overflow:hidden;background:#111;font-family:Arial;color:white}
-#hud{position:fixed;top:12px;left:12px;z-index:5}
-.panel{background:#0009;padding:12px;border-radius:10px;margin-bottom:7px}
-#health{color:#42ff75;font-weight:bold}
-#start{position:fixed;inset:0;background:#000b;z-index:10;
-display:flex;align-items:center;justify-content:center;flex-direction:column}
-button{padding:14px 24px;border:0;border-radius:10px;
-background:#ff9800;color:white;font-size:18px;font-weight:bold}
-#controls{position:fixed;bottom:20px;left:20px;right:20px;
-display:flex;justify-content:space-between;pointer-events:none}
-#controls button{pointer-events:auto;opacity:.85}
-#message{font-size:14px}
-</style>
-</head>
-<body>
-
-<div id="hud">
- <div class="panel">BATTLE ROYALE 3D</div>
- <div class="panel">❤️ Health: <span id="health">100</span></div>
- <div class="panel">🎯 Score: <span id="score">0</span></div>
- <div class="panel">👾 Enemies: <span id="enemies">0</span></div>
- <div id="message"></div>
-</div>
-
-<div id="start">
- <h1>🔥 BATTLE ROYALE</h1>
- <p>3D Survival Mini Game</p>
- <button onclick="startGame()">START GAME</button>
-</div>
-
-<div id="controls">
- <button id="left">◀</button>
- <button id="shoot">🔫 FIRE</button>
- <button id="right">▶</button>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-let scene,camera,renderer,player;
-let enemies=[],bullets=[];
-let health=100,score=0,playing=false;
-let keys={};
-let move={left:false,right:false,up:false,down:false};
-
-function startGame(){
- document.getElementById("start").style.display="none";
- if(!renderer) init();
- playing=true;
-}
-
-function init(){
- scene=new THREE.Scene();
- scene.background=new THREE.Color(0x87ceeb);
- scene.fog=new THREE.Fog(0x87ceeb,40,150);
-
- camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,500);
- renderer=new THREE.WebGLRenderer({antialias:true});
- renderer.setSize(innerWidth,innerHeight);
- renderer.setPixelRatio(Math.min(devicePixelRatio,2));
- document.body.appendChild(renderer.domElement);
-
- scene.add(new THREE.HemisphereLight(0xffffff,0x445533,2));
- let sun=new THREE.DirectionalLight(0xffffff,2);
- sun.position.set(20,40,20);
- scene.add(sun);
-
- let ground=new THREE.Mesh(
-  new THREE.PlaneGeometry(200,200),
-  new THREE.MeshStandardMaterial({color:0x477b37})
- );
- ground.rotation.x=-Math.PI/2;
- scene.add(ground);
-
- // Buildings
- for(let i=0;i<35;i++){
-  let x=Math.random()*120-60;
-  let z=Math.random()*120-60;
-  if(Math.abs(x)<9 && Math.abs(z)<9)continue;
-  let w=5+Math.random()*5;
-  let h=4+Math.random()*9;
-  let b=new THREE.Mesh(
-   new THREE.BoxGeometry(w,h,6),
-   new THREE.MeshStandardMaterial({color:0x99918a})
-  );
-  b.position.set(x,h/2,z);
-  scene.add(b);
- }
-
- // Trees
- for(let i=0;i<60;i++){
-  let x=Math.random()*150-75;
-  let z=Math.random()*150-75;
-  let trunk=new THREE.Mesh(
-   new THREE.CylinderGeometry(.25,.4,2),
-   new THREE.MeshStandardMaterial({color:0x654321})
-  );
-  trunk.position.set(x,1,z);
-  scene.add(trunk);
-  let leaves=new THREE.Mesh(
-   new THREE.SphereGeometry(1.8,8,8),
-   new THREE.MeshStandardMaterial({color:0x176b28})
-  );
-  leaves.position.set(x,3,z);
-  scene.add(leaves);
- }
-
- // Player
- player=new THREE.Group();
  let body=new THREE.Mesh(
-  new THREE.BoxGeometry(1,1.6,.6),
-  new THREE.MeshStandardMaterial({color:0x174cff})
+  new THREE.BoxGeometry(1,1.5,.65),
+  new THREE.MeshStandardMaterial({color:0xe52b2b})
  );
  body.position.y=1;
- player.add(body);
+ enemy.add(body);
+
  let head=new THREE.Mesh(
-  new THREE.SphereGeometry(.38,16,16),
+  new THREE.SphereGeometry(.35,12,12),
   new THREE.MeshStandardMaterial({color:0xffc99b})
  );
  head.position.y=2;
- player.add(head);
- scene.add(player);
- player.position.set(0,0,0);
+ enemy.add(head);
 
- for(let i=0;i<8;i++)createEnemy();
+ let x,z;
+ do{
+  x=Math.random()*50-25;
+  z=Math.random()*50-25;
+ }while(Math.abs(x)<8 && Math.abs(z)<8);
 
- camera.position.set(0,7,10);
- animate();
-}
-
-function createEnemy(){
- let enemy=new THREE.Mesh(
-  new THREE.BoxGeometry(1,1.8,.7),
-  new THREE.MeshStandardMaterial({color:0xff3030})
- );
- enemy.position.set(Math.random()*50-25,1,Math.random()*50-25);
+ enemy.position.set(x,0,z);
  enemy.userData.hp=1;
+
  scene.add(enemy);
  enemies.push(enemy);
 }
 
 function shoot(){
  if(!playing)return;
+
+ let target=null;
+ let nearest=Infinity;
+
+ enemies.forEach(e=>{
+  let d=player.position.distanceTo(e.position);
+  if(d<nearest){
+   nearest=d;
+   target=e;
+  }
+ });
+
  let direction=new THREE.Vector3(0,0,-1);
- direction.applyQuaternion(player.quaternion);
+
+ if(target){
+  direction.subVectors(target.position,player.position);
+  direction.y=0;
+  direction.normalize();
+  player.rotation.y=Math.atan2(direction.x,-direction.z);
+ }else{
+  direction.applyQuaternion(player.quaternion);
+ }
+
  let bullet=new THREE.Mesh(
   new THREE.SphereGeometry(.16,8,8),
   new THREE.MeshBasicMaterial({color:0xffff00})
  );
+
  bullet.position.copy(player.position);
- bullet.position.y+=1.3;
+ bullet.position.y=1.3;
  bullet.userData.velocity=direction.multiplyScalar(.9);
+ bullet.userData.life=100;
+
  scene.add(bullet);
  bullets.push(bullet);
 }
 
+function bindButton(id,property){
+ const el=$(id);
+
+ el.addEventListener("pointerdown",e=>{
+  e.preventDefault();
+  movement[property]=true;
+ });
+
+ ["pointerup","pointerleave","pointercancel"].forEach(event=>{
+  el.addEventListener(event,()=>{
+   movement[property]=false;
+  });
+ });
+}
+
+bindButton("left","left");
+bindButton("right","right");
+bindButton("forward","forward");
+bindButton("back","back");
+
+$("fire").addEventListener("pointerdown",e=>{
+ e.preventDefault();
+ shoot();
+});
+
+document.addEventListener("keydown",e=>{
+ keys[e.key.toLowerCase()]=true;
+});
+
+document.addEventListener("keyup",e=>{
+ keys[e.key.toLowerCase()]=false;
+});
+
 function animate(){
  requestAnimationFrame(animate);
- if(!playing)return;
 
- let speed=.16;
- if(keys["w"]||keys["ArrowUp"]||move.up)player.position.z-=speed;
- if(keys["s"]||keys["ArrowDown"]||move.down)player.position.z+=speed;
- if(keys["a"]||keys["ArrowLeft"]||move.left)player.position.x-=speed;
- if(keys["d"]||keys["ArrowRight"]||move.right)player.position.x+=speed;
+ if(!playing){
+  renderer.render(scene,camera);
+  return;
+ }
 
- player.position.x=Math.max(-90,Math.min(90,player.position.x));
- player.position.z=Math.max(-90,Math.min(90,player.position.z));
+ const speed=.16;
 
- camera.position.lerp(
-  new THREE.Vector3(player.position.x,player.position.y+7,player.position.z+10),.1
+ let dx=0,dz=0;
+
+ if(keys.w||keys.arrowup||movement.forward)dz-=1;
+ if(keys.s||keys.arrowdown||movement.back)dz+=1;
+ if(keys.a||keys.arrowleft||movement.left)dx-=1;
+ if(keys.d||keys.arrowright||movement.right)dx+=1;
+
+ if(dx!==0||dz!==0){
+  let length=Math.hypot(dx,dz);
+  dx/=length;
+  dz/=length;
+
+  player.position.x+=dx*speed;
+  player.position.z+=dz*speed;
+  player.rotation.y=Math.atan2(-dx,-dz);
+ }
+
+ player.position.x=THREE.MathUtils.clamp(player.position.x,-90,90);
+ player.position.z=THREE.MathUtils.clamp(player.position.z,-90,90);
+
+ // Camera follow
+ const desired=new THREE.Vector3(
+  player.position.x,
+  7,
+  player.position.z+10
  );
- camera.lookAt(player.position.x,player.position.y+1,player.position.z);
+ camera.position.lerp(desired,.12);
+ camera.lookAt(
+  player.position.x,
+  player.position.y+1,
+  player.position.z
+ );
 
- bullets.forEach((b,i)=>{
+ // Bullet movement
+ for(let i=bullets.length-1;i>=0;i--){
+  let b=bullets[i];
   b.position.add(b.userData.velocity);
-  enemies.forEach((e,j)=>{
-   if(b.position.distanceTo(e.position)<1.4){
+  b.userData.life--;
+
+  let hit=false;
+
+  for(let j=enemies.length-1;j>=0;j--){
+   let e=enemies[j];
+
+   if(b.position.distanceTo(
+    new THREE.Vector3(e.position.x,e.position.y+1,e.position.z)
+   )<1.2){
     scene.remove(e);
-    scene.remove(b);
     enemies.splice(j,1);
-    bullets.splice(i,1);
     score+=10;
-    document.getElementById("score").textContent=score;
+    $("score").textContent=score;
+    hit=true;
+    break;
    }
-  });
-  if(Math.abs(b.position.x)>100||Math.abs(b.position.z)>100){
+  }
+
+  if(hit||b.userData.life<=0){
    scene.remove(b);
    bullets.splice(i,1);
   }
- });
+ }
 
- enemies.forEach(e=>{
+ // Enemy movement
+ for(let e of enemies){
   let dir=new THREE.Vector3().subVectors(player.position,e.position);
   dir.y=0;
+
   if(dir.length()>1.5){
    dir.normalize();
    e.position.addScaledVector(dir,.025);
   }
+
   if(e.position.distanceTo(player.position)<1.5){
-   health-=.015;
-  }
- });
-
- document.getElementById("health").textContent=Math.max(0,Math.floor(health));
- document.getElementById("enemies").textContent=enemies.length;
-
- if(health<=0){
-  playing=false;
-  document.getElementById("message").textContent="GAME OVER! Refresh to restart.";
- }
- if(enemies.length===0 && playing){
-  for(let i=0;i<8;i++)createEnemy();
- }
- renderer.render(scene,camera);
-}
-
-document.addEventListener("keydown",e=>keys[e.key]=true);
-document.addEventListener("keyup",e=>keys[e.key]=false);
-
-function bind(id,property){
- let el=document.getElementById(id);
- el.addEventListener("pointerdown",e=>{
-  e.preventDefault();move[property]=true;
- });
- ["pointerup","pointerleave","pointercancel"].forEach(event=>{
-  el.addEventListener(event,()=>move[property]=false);
- });
-}
-bind("left","left");
-bind("right","right");
-
-document.getElementById("shoot").addEventListener("pointerdown",shoot);
-
-document.addEventListener("click",e=>{
- if(e.target===renderer?.domElement)shoot();
-});
-
-window.addEventListener("resize",()=>{
- if(!camera)return;
- camera.aspect=innerWidth/innerHeight;
- camera.updateProjectionMatrix();
- renderer.setSize(innerWidth,innerHeight);
-});
-</script>
-</body>
-</html>
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Battle Royale 3D</title>
-<style>
-*{box-sizing:border-box}
-body{margin:0;overflow:hidden;background:#111;font-family:Arial;color:white}
-#hud{position:fixed;top:12px;left:12px;z-index:5}
-.panel{background:#0009;padding:12px;border-radius:10px;margin-bottom:7px}
-#health{color:#42ff75;font-weight:bold}
-#start{position:fixed;inset:0;background:#000b;z-index:10;
-display:flex;align-items:center;justify-content:center;flex-direction:column}
-button{padding:14px 24px;border:0;border-radius:10px;
-background:#ff9800;color:white;font-size:18px;font-weight:bold}
-#controls{position:fixed;bottom:20px;left:20px;right:20px;
-display:flex;justify-content:space-between;pointer-events:none}
-#controls button{pointer-events:auto;opacity:.85}
-#message{font-size:14px}
-</style>
-</head>
-<body>
-
-<div id="hud">
- <div class="panel">BATTLE ROYALE 3D</div>
- <div class="panel">❤️ Health: <span id="health">100</span></div>
- <div class="panel">🎯 Score: <span id="score">0</span></div>
- <div class="panel">👾 Enemies: <span id="enemies">0</span></div>
- <div id="message"></div>
-</div>
-
-<div id="start">
- <h1>🔥 BATTLE ROYALE</h1>
- <p>3D Survival Mini Game</p>
- <button onclick="startGame()">START GAME</button>
-</div>
-
-<div id="controls">
- <button id="left">◀</button>
- <button id="shoot">🔫 FIRE</button>
- <button id="right">▶</button>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-let scene,camera,renderer,player;
-let enemies=[],bullets=[];
-let health=100,score=0,playing=false;
-let keys={};
-let move={left:false,right:false,up:false,down:false};
-
-function startGame(){
- document.getElementById("start").style.display="none";
- if(!renderer) init();
- playing=true;
-}
-
-function init(){
- scene=new THREE.Scene();
- scene.background=new THREE.Color(0x87ceeb);
- scene.fog=new THREE.Fog(0x87ceeb,40,150);
-
- camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,500);
- renderer=new THREE.WebGLRenderer({antialias:true});
- renderer.setSize(innerWidth,innerHeight);
- renderer.setPixelRatio(Math.min(devicePixelRatio,2));
- document.body.appendChild(renderer.domElement);
-
- scene.add(new THREE.HemisphereLight(0xffffff,0x445533,2));
- let sun=new THREE.DirectionalLight(0xffffff,2);
- sun.position.set(20,40,20);
- scene.add(sun);
-
- let ground=new THREE.Mesh(
-  new THREE.PlaneGeometry(200,200),
-  new THREE.MeshStandardMaterial({color:0x477b37})
- );
- ground.rotation.x=-Math.PI/2;
- scene.add(ground);
-
- // Buildings
- for(let i=0;i<35;i++){
-  let x=Math.random()*120-60;
-  let z=Math.random()*120-60;
-  if(Math.abs(x)<9 && Math.abs(z)<9)continue;
-  let w=5+Math.random()*5;
-  let h=4+Math.random()*9;
-  let b=new THREE.Mesh(
-   new THREE.BoxGeometry(w,h,6),
-   new THREE.MeshStandardMaterial({color:0x99918a})
-  );
-  b.position.set(x,h/2,z);
-  scene.add(b);
- }
-
- // Trees
- for(let i=0;i<60;i++){
-  let x=Math.random()*150-75;
-  let z=Math.random()*150-75;
-  let trunk=new THREE.Mesh(
-   new THREE.CylinderGeometry(.25,.4,2),
-   new THREE.MeshStandardMaterial({color:0x654321})
-  );
-  trunk.position.set(x,1,z);
-  scene.add(trunk);
-  let leaves=new THREE.Mesh(
-   new THREE.SphereGeometry(1.8,8,8),
-   new THREE.MeshStandardMaterial({color:0x176b28})
-  );
-  leaves.position.set(x,3,z);
-  scene.add(leaves);
- }
-
- // Player
- player=new THREE.Group();
- let body=new THREE.Mesh(
-  new THREE.BoxGeometry(1,1.6,.6),
-  new THREE.MeshStandardMaterial({color:0x174cff})
- );
- body.position.y=1;
- player.add(body);
- let head=new THREE.Mesh(
-  new THREE.SphereGeometry(.38,16,16),
-  new THREE.MeshStandardMaterial({color:0xffc99b})
- );
- head.position.y=2;
- player.add(head);
- scene.add(player);
- player.position.set(0,0,0);
-
- for(let i=0;i<8;i++)createEnemy();
-
- camera.position.set(0,7,10);
- animate();
-}
-
-function createEnemy(){
- let enemy=new THREE.Mesh(
-  new THREE.BoxGeometry(1,1.8,.7),
-  new THREE.MeshStandardMaterial({color:0xff3030})
- );
- enemy.position.set(Math.random()*50-25,1,Math.random()*50-25);
- enemy.userData.hp=1;
- scene.add(enemy);
- enemies.push(enemy);
-}
-
-function shoot(){
- if(!playing)return;
- let direction=new THREE.Vector3(0,0,-1);
- direction.applyQuaternion(player.quaternion);
- let bullet=new THREE.Mesh(
-  new THREE.SphereGeometry(.16,8,8),
-  new THREE.MeshBasicMaterial({color:0xffff00})
- );
- bullet.position.copy(player.position);
- bullet.position.y+=1.3;
- bullet.userData.velocity=direction.multiplyScalar(.9);
- scene.add(bullet);
- bullets.push(bullet);
-}
-
-function animate(){
- requestAnimationFrame(animate);
- if(!playing)return;
-
- let speed=.16;
- if(keys["w"]||keys["ArrowUp"]||move.up)player.position.z-=speed;
- if(keys["s"]||keys["ArrowDown"]||move.down)player.position.z+=speed;
- if(keys["a"]||keys["ArrowLeft"]||move.left)player.position.x-=speed;
- if(keys["d"]||keys["ArrowRight"]||move.right)player.position.x+=speed;
-
- player.position.x=Math.max(-90,Math.min(90,player.position.x));
- player.position.z=Math.max(-90,Math.min(90,player.position.z));
-
- camera.position.lerp(
-  new THREE.Vector3(player.position.x,player.position.y+7,player.position.z+10),.1
- );
- camera.lookAt(player.position.x,player.position.y+1,player.position.z);
-
- bullets.forEach((b,i)=>{
-  b.position.add(b.userData.velocity);
-  enemies.forEach((e,j)=>{
-   if(b.position.distanceTo(e.position)<1.4){
-    scene.remove(e);
-    scene.remove(b);
-    enemies.splice(j,1);
-    bullets.splice(i,1);
-    score+=10;
-    document.getElementById("score").textContent=score;
+   if(Date.now()-lastDamage>500){
+    health-=2;
+    lastDamage=Date.now();
+    $("health").textContent=health;
    }
-  });
-  if(Math.abs(b.position.x)>100||Math.abs(b.position.z)>100){
-   scene.remove(b);
-   bullets.splice(i,1);
   }
- });
+ }
 
- enemies.forEach(e=>{
-  let dir=new THREE.Vector3().subVectors(player.position,e.position);
-  dir.y=0;
-  if(dir.length()>1.5){
-   dir.normalize();
-   e.position.addScaledVector(dir,.025);
-  }
-  if(e.position.distanceTo(player.position)<1.5){
-   health-=.015;
-  }
- });
-
- document.getElementById("health").textContent=Math.max(0,Math.floor(health));
- document.getElementById("enemies").textContent=enemies.length;
+ $("enemies").textContent=enemies.length;
 
  if(health<=0){
   playing=false;
-  document.getElementById("message").textContent="GAME OVER! Refresh to restart.";
+  $("start").style.display="flex";
+  $("startBtn").textContent="RESTART GAME";
+  status("GAME OVER! Your score: "+score);
  }
- if(enemies.length===0 && playing){
+
+ if(enemies.length===0){
   for(let i=0;i<8;i++)createEnemy();
  }
+
  renderer.render(scene,camera);
 }
 
-document.addEventListener("keydown",e=>keys[e.key]=true);
-document.addEventListener("keyup",e=>keys[e.key]=false);
-
-function bind(id,property){
- let el=document.getElementById(id);
- el.addEventListener("pointerdown",e=>{
-  e.preventDefault();move[property]=true;
- });
- ["pointerup","pointerleave","pointercancel"].forEach(event=>{
-  el.addEventListener(event,()=>move[property]=false);
- });
+// Wait until the 3D engine is ready
+function checkEngine(){
+ if(window.THREE){
+  $("startBtn").disabled=false;
+  $("startBtn").textContent="START GAME";
+  status("3D Engine Ready! Press Start Game.");
+ }else{
+  status("Loading 3D engine... Please wait.");
+  setTimeout(checkEngine,500);
+ }
 }
-bind("left","left");
-bind("right","right");
-
-document.getElementById("shoot").addEventListener("pointerdown",shoot);
-
-document.addEventListener("click",e=>{
- if(e.target===renderer?.domElement)shoot();
-});
+checkEngine();
 
 window.addEventListener("resize",()=>{
- if(!camera)return;
- camera.aspect=innerWidth/innerHeight;
- camera.updateProjectionMatrix();
- renderer.setSize(innerWidth,innerHeight);
-});
-</script>
-</body>
-</html>
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Battle Royale 3D</title>
-<style>
-*{box-sizing:border-box}
-body{margin:0;overflow:hidden;background:#111;font-family:Arial;color:white}
-#hud{position:fixed;top:12px;left:12px;z-index:5}
-.panel{background:#0009;padding:12px;border-radius:10px;margin-bottom:7px}
-#health{color:#42ff75;font-weight:bold}
-#start{position:fixed;inset:0;background:#000b;z-index:10;
-display:flex;align-items:center;justify-content:center;flex-direction:column}
-button{padding:14px 24px;border:0;border-radius:10px;
-background:#ff9800;color:white;font-size:18px;font-weight:bold}
-#controls{position:fixed;bottom:20px;left:20px;right:20px;
-display:flex;justify-content:space-between;pointer-events:none}
-#controls button{pointer-events:auto;opacity:.85}
-#message{font-size:14px}
-</style>
-</head>
-<body>
-
-<div id="hud">
- <div class="panel">BATTLE ROYALE 3D</div>
- <div class="panel">❤️ Health: <span id="health">100</span></div>
- <div class="panel">🎯 Score: <span id="score">0</span></div>
- <div class="panel">👾 Enemies: <span id="enemies">0</span></div>
- <div id="message"></div>
-</div>
-
-<div id="start">
- <h1>🔥 BATTLE ROYALE</h1>
- <p>3D Survival Mini Game</p>
- <button onclick="startGame()">START GAME</button>
-</div>
-
-<div id="controls">
- <button id="left">◀</button>
- <button id="shoot">🔫 FIRE</button>
- <button id="right">▶</button>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-let scene,camera,renderer,player;
-let enemies=[],bullets=[];
-let health=100,score=0,playing=false;
-let keys={};
-let move={left:false,right:false,up:false,down:false};
-
-function startGame(){
- document.getElementById("start").style.display="none";
- if(!renderer) init();
- playing=true;
-}
-
-function init(){
- scene=new THREE.Scene();
- scene.background=new THREE.Color(0x87ceeb);
- scene.fog=new THREE.Fog(0x87ceeb,40,150);
-
- camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,500);
- renderer=new THREE.WebGLRenderer({antialias:true});
- renderer.setSize(innerWidth,innerHeight);
- renderer.setPixelRatio(Math.min(devicePixelRatio,2));
- document.body.appendChild(renderer.domElement);
-
- scene.add(new THREE.HemisphereLight(0xffffff,0x445533,2));
- let sun=new THREE.DirectionalLight(0xffffff,2);
- sun.position.set(20,40,20);
- scene.add(sun);
-
- let ground=new THREE.Mesh(
-  new THREE.PlaneGeometry(200,200),
-  new THREE.MeshStandardMaterial({color:0x477b37})
- );
- ground.rotation.x=-Math.PI/2;
- scene.add(ground);
-
- // Buildings
- for(let i=0;i<35;i++){
-  let x=Math.random()*120-60;
-  let z=Math.random()*120-60;
-  if(Math.abs(x)<9 && Math.abs(z)<9)continue;
-  let w=5+Math.random()*5;
-  let h=4+Math.random()*9;
-  let b=new THREE.Mesh(
-   new THREE.BoxGeometry(w,h,6),
-   new THREE.MeshStandardMaterial({color:0x99918a})
-  );
-  b.position.set(x,h/2,z);
-  scene.add(b);
- }
-
- // Trees
- for(let i=0;i<60;i++){
-  let x=Math.random()*150-75;
-  let z=Math.random()*150-75;
-  let trunk=new THREE.Mesh(
-   new THREE.CylinderGeometry(.25,.4,2),
-   new THREE.MeshStandardMaterial({color:0x654321})
-  );
-  trunk.position.set(x,1,z);
-  scene.add(trunk);
-  let leaves=new THREE.Mesh(
-   new THREE.SphereGeometry(1.8,8,8),
-   new THREE.MeshStandardMaterial({color:0x176b28})
-  );
-  leaves.position.set(x,3,z);
-  scene.add(leaves);
- }
-
- // Player
- player=new THREE.Group();
- let body=new THREE.Mesh(
-  new THREE.BoxGeometry(1,1.6,.6),
-  new THREE.MeshStandardMaterial({color:0x174cff})
- );
- body.position.y=1;
- player.add(body);
- let head=new THREE.Mesh(
-  new THREE.SphereGeometry(.38,16,16),
-  new THREE.MeshStandardMaterial({color:0xffc99b})
- );
- head.position.y=2;
- player.add(head);
- scene.add(player);
- player.position.set(0,0,0);
-
- for(let i=0;i<8;i++)createEnemy();
-
- camera.position.set(0,7,10);
- animate();
-}
-
-function createEnemy(){
- let enemy=new THREE.Mesh(
-  new THREE.BoxGeometry(1,1.8,.7),
-  new THREE.MeshStandardMaterial({color:0xff3030})
- );
- enemy.position.set(Math.random()*50-25,1,Math.random()*50-25);
- enemy.userData.hp=1;
- scene.add(enemy);
- enemies.push(enemy);
-}
-
-function shoot(){
- if(!playing)return;
- let direction=new THREE.Vector3(0,0,-1);
- direction.applyQuaternion(player.quaternion);
- let bullet=new THREE.Mesh(
-  new THREE.SphereGeometry(.16,8,8),
-  new THREE.MeshBasicMaterial({color:0xffff00})
- );
- bullet.position.copy(player.position);
- bullet.position.y+=1.3;
- bullet.userData.velocity=direction.multiplyScalar(.9);
- scene.add(bullet);
- bullets.push(bullet);
-}
-
-function animate(){
- requestAnimationFrame(animate);
- if(!playing)return;
-
- let speed=.16;
- if(keys["w"]||keys["ArrowUp"]||move.up)player.position.z-=speed;
- if(keys["s"]||keys["ArrowDown"]||move.down)player.position.z+=speed;
- if(keys["a"]||keys["ArrowLeft"]||move.left)player.position.x-=speed;
- if(keys["d"]||keys["ArrowRight"]||move.right)player.position.x+=speed;
-
- player.position.x=Math.max(-90,Math.min(90,player.position.x));
- player.position.z=Math.max(-90,Math.min(90,player.position.z));
-
- camera.position.lerp(
-  new THREE.Vector3(player.position.x,player.position.y+7,player.position.z+10),.1
- );
- camera.lookAt(player.position.x,player.position.y+1,player.position.z);
-
- bullets.forEach((b,i)=>{
-  b.position.add(b.userData.velocity);
-  enemies.forEach((e,j)=>{
-   if(b.position.distanceTo(e.position)<1.4){
-    scene.remove(e);
-    scene.remove(b);
-    enemies.splice(j,1);
-    bullets.splice(i,1);
-    score+=10;
-    document.getElementById("score").textContent=score;
-   }
-  });
-  if(Math.abs(b.position.x)>100||Math.abs(b.position.z)>100){
-   scene.remove(b);
-   bullets.splice(i,1);
-  }
- });
-
- enemies.forEach(e=>{
-  let dir=new THREE.Vector3().subVectors(player.position,e.position);
-  dir.y=0;
-  if(dir.length()>1.5){
-   dir.normalize();
-   e.position.addScaledVector(dir,.025);
-  }
-  if(e.position.distanceTo(player.position)<1.5){
-   health-=.015;
-  }
- });
-
- document.getElementById("health").textContent=Math.max(0,Math.floor(health));
- document.getElementById("enemies").textContent=enemies.length;
-
- if(health<=0){
-  playing=false;
-  document.getElementById("message").textContent="GAME OVER! Refresh to restart.";
- }
- if(enemies.length===0 && playing){
-  for(let i=0;i<8;i++)createEnemy();
- }
- renderer.render(scene,camera);
-}
-
-document.addEventListener("keydown",e=>keys[e.key]=true);
-document.addEventListener("keyup",e=>keys[e.key]=false);
-
-function bind(id,property){
- let el=document.getElementById(id);
- el.addEventListener("pointerdown",e=>{
-  e.preventDefault();move[property]=true;
- });
- ["pointerup","pointerleave","pointercancel"].forEach(event=>{
-  el.addEventListener(event,()=>move[property]=false);
- });
-}
-bind("left","left");
-bind("right","right");
-
-document.getElementById("shoot").addEventListener("pointerdown",shoot);
-
-document.addEventListener("click",e=>{
- if(e.target===renderer?.domElement)shoot();
-});
-
-window.addEventListener("resize",()=>{
- if(!camera)return;
- camera.aspect=innerWidth/innerHeight;
- camera.updateProjectionMatrix();
- renderer.setSize(innerWidth,innerHeight);
-});
-</script>
-</body>
-</html>
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Battle Royale 3D</title>
-<style>
-*{box-sizing:border-box}
-body{margin:0;overflow:hidden;background:#111;font-family:Arial;color:white}
-#hud{position:fixed;top:12px;left:12px;z-index:5}
-.panel{background:#0009;padding:12px;border-radius:10px;margin-bottom:7px}
-#health{color:#42ff75;font-weight:bold}
-#start{position:fixed;inset:0;background:#000b;z-index:10;
-display:flex;align-items:center;justify-content:center;flex-direction:column}
-button{padding:14px 24px;border:0;border-radius:10px;
-background:#ff9800;color:white;font-size:18px;font-weight:bold}
-#controls{position:fixed;bottom:20px;left:20px;right:20px;
-display:flex;justify-content:space-between;pointer-events:none}
-#controls button{pointer-events:auto;opacity:.85}
-#message{font-size:14px}
-</style>
-</head>
-<body>
-
-<div id="hud">
- <div class="panel">BATTLE ROYALE 3D</div>
- <div class="panel">❤️ Health: <span id="health">100</span></div>
- <div class="panel">🎯 Score: <span id="score">0</span></div>
- <div class="panel">👾 Enemies: <span id="enemies">0</span></div>
- <div id="message"></div>
-</div>
-
-<div id="start">
- <h1>🔥 BATTLE ROYALE</h1>
- <p>3D Survival Mini Game</p>
- <button onclick="startGame()">START GAME</button>
-</div>
-
-<div id="controls">
- <button id="left">◀</button>
- <button id="shoot">🔫 FIRE</button>
- <button id="right">▶</button>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-let scene,camera,renderer,player;
-let enemies=[],bullets=[];
-let health=100,score=0,playing=false;
-let keys={};
-let move={left:false,right:false,up:false,down:false};
-
-function startGame(){
- document.getElementById("start").style.display="none";
- if(!renderer) init();
- playing=true;
-}
-
-function init(){
- scene=new THREE.Scene();
- scene.background=new THREE.Color(0x87ceeb);
- scene.fog=new THREE.Fog(0x87ceeb,40,150);
-
- camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,500);
- renderer=new THREE.WebGLRenderer({antialias:true});
- renderer.setSize(innerWidth,innerHeight);
- renderer.setPixelRatio(Math.min(devicePixelRatio,2));
- document.body.appendChild(renderer.domElement);
-
- scene.add(new THREE.HemisphereLight(0xffffff,0x445533,2));
- let sun=new THREE.DirectionalLight(0xffffff,2);
- sun.position.set(20,40,20);
- scene.add(sun);
-
- let ground=new THREE.Mesh(
-  new THREE.PlaneGeometry(200,200),
-  new THREE.MeshStandardMaterial({color:0x477b37})
- );
- ground.rotation.x=-Math.PI/2;
- scene.add(ground);
-
- // Buildings
- for(let i=0;i<35;i++){
-  let x=Math.random()*120-60;
-  let z=Math.random()*120-60;
-  if(Math.abs(x)<9 && Math.abs(z)<9)continue;
-  let w=5+Math.random()*5;
-  let h=4+Math.random()*9;
-  let b=new THREE.Mesh(
-   new THREE.BoxGeometry(w,h,6),
-   new THREE.MeshStandardMaterial({color:0x99918a})
-  );
-  b.position.set(x,h/2,z);
-  scene.add(b);
- }
-
- // Trees
- for(let i=0;i<60;i++){
-  let x=Math.random()*150-75;
-  let z=Math.random()*150-75;
-  let trunk=new THREE.Mesh(
-   new THREE.CylinderGeometry(.25,.4,2),
-   new THREE.MeshStandardMaterial({color:0x654321})
-  );
-  trunk.position.set(x,1,z);
-  scene.add(trunk);
-  let leaves=new THREE.Mesh(
-   new THREE.SphereGeometry(1.8,8,8),
-   new THREE.MeshStandardMaterial({color:0x176b28})
-  );
-  leaves.position.set(x,3,z);
-  scene.add(leaves);
- }
-
- // Player
- player=new THREE.Group();
- let body=new THREE.Mesh(
-  new THREE.BoxGeometry(1,1.6,.6),
-  new THREE.MeshStandardMaterial({color:0x174cff})
- );
- body.position.y=1;
- player.add(body);
- let head=new THREE.Mesh(
-  new THREE.SphereGeometry(.38,16,16),
-  new THREE.MeshStandardMaterial({color:0xffc99b})
- );
- head.position.y=2;
- player.add(head);
- scene.add(player);
- player.position.set(0,0,0);
-
- for(let i=0;i<8;i++)createEnemy();
-
- camera.position.set(0,7,10);
- animate();
-}
-
-function createEnemy(){
- let enemy=new THREE.Mesh(
-  new THREE.BoxGeometry(1,1.8,.7),
-  new THREE.MeshStandardMaterial({color:0xff3030})
- );
- enemy.position.set(Math.random()*50-25,1,Math.random()*50-25);
- enemy.userData.hp=1;
- scene.add(enemy);
- enemies.push(enemy);
-}
-
-function shoot(){
- if(!playing)return;
- let direction=new THREE.Vector3(0,0,-1);
- direction.applyQuaternion(player.quaternion);
- let bullet=new THREE.Mesh(
-  new THREE.SphereGeometry(.16,8,8),
-  new THREE.MeshBasicMaterial({color:0xffff00})
- );
- bullet.position.copy(player.position);
- bullet.position.y+=1.3;
- bullet.userData.velocity=direction.multiplyScalar(.9);
- scene.add(bullet);
- bullets.push(bullet);
-}
-
-function animate(){
- requestAnimationFrame(animate);
- if(!playing)return;
-
- let speed=.16;
- if(keys["w"]||keys["ArrowUp"]||move.up)player.position.z-=speed;
- if(keys["s"]||keys["ArrowDown"]||move.down)player.position.z+=speed;
- if(keys["a"]||keys["ArrowLeft"]||move.left)player.position.x-=speed;
- if(keys["d"]||keys["ArrowRight"]||move.right)player.position.x+=speed;
-
- player.position.x=Math.max(-90,Math.min(90,player.position.x));
- player.position.z=Math.max(-90,Math.min(90,player.position.z));
-
- camera.position.lerp(
-  new THREE.Vector3(player.position.x,player.position.y+7,player.position.z+10),.1
- );
- camera.lookAt(player.position.x,player.position.y+1,player.position.z);
-
- bullets.forEach((b,i)=>{
-  b.position.add(b.userData.velocity);
-  enemies.forEach((e,j)=>{
-   if(b.position.distanceTo(e.position)<1.4){
-    scene.remove(e);
-    scene.remove(b);
-    enemies.splice(j,1);
-    bullets.splice(i,1);
-    score+=10;
-    document.getElementById("score").textContent=score;
-   }
-  });
-  if(Math.abs(b.position.x)>100||Math.abs(b.position.z)>100){
-   scene.remove(b);
-   bullets.splice(i,1);
-  }
- });
-
- enemies.forEach(e=>{
-  let dir=new THREE.Vector3().subVectors(player.position,e.position);
-  dir.y=0;
-  if(dir.length()>1.5){
-   dir.normalize();
-   e.position.addScaledVector(dir,.025);
-  }
-  if(e.position.distanceTo(player.position)<1.5){
-   health-=.015;
-  }
- });
-
- document.getElementById("health").textContent=Math.max(0,Math.floor(health));
- document.getElementById("enemies").textContent=enemies.length;
-
- if(health<=0){
-  playing=false;
-  document.getElementById("message").textContent="GAME OVER! Refresh to restart.";
- }
- if(enemies.length===0 && playing){
-  for(let i=0;i<8;i++)createEnemy();
- }
- renderer.render(scene,camera);
-}
-
-document.addEventListener("keydown",e=>keys[e.key]=true);
-document.addEventListener("keyup",e=>keys[e.key]=false);
-
-function bind(id,property){
- let el=document.getElementById(id);
- el.addEventListener("pointerdown",e=>{
-  e.preventDefault();move[property]=true;
- });
- ["pointerup","pointerleave","pointercancel"].forEach(event=>{
-  el.addEventListener(event,()=>move[property]=false);
- });
-}
-bind("left","left");
-bind("right","right");
-
-document.getElementById("shoot").addEventListener("pointerdown",shoot);
-
-document.addEventListener("click",e=>{
- if(e.target===renderer?.domElement)shoot();
-});
-
-window.addEventListener("resize",()=>{
- if(!camera)return;
+ if(!camera||!renderer)return;
  camera.aspect=innerWidth/innerHeight;
  camera.updateProjectionMatrix();
  renderer.setSize(innerWidth,innerHeight);
